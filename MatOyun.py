@@ -10,10 +10,13 @@ class MatematikOyunu:
     def __init__(self, root):
         self.root = root
         self.root.title("Matematik Zeka & Hafıza Oyunu")
-        self.root.geometry("900x750")
+        self.root.geometry("950x750")
 
         self.puan = 0
         self.rekor_puan = 0
+        self.oyun_gecmisi = []
+        self.guncel_islem_str = ""
+        self.soru_baslangic_zamani = 0
 
         self.is_dark_mode = False
         self.colors = {
@@ -68,12 +71,18 @@ class MatematikOyunu:
 
         self.tab_oyun = tk.Frame(self.notebook)
         self.tab_carpim = tk.Frame(self.notebook)
+        self.tab_hesap = tk.Frame(self.notebook)
+        self.tab_gecmis = tk.Frame(self.notebook)
 
         self.notebook.add(self.tab_oyun, text="🎮 Oyuna Başla")
         self.notebook.add(self.tab_carpim, text="📊 100x100 Çarpım Tablosu")
+        self.notebook.add(self.tab_hesap, text="🧮 Hesap Makinesi")
+        self.notebook.add(self.tab_gecmis, text="📜 Geçmiş")
 
         self.setup_tab_oyun()
         self.setup_tab_carpim()
+        self.setup_tab_hesap()
+        self.setup_tab_gecmis()
 
     def setup_tab_oyun(self):
         self.frame_ayarlar = tk.LabelFrame(
@@ -166,7 +175,6 @@ class MatematikOyunu:
         )
         self.btn_baslat.grid(row=7, column=0, columnspan=2, pady=10, sticky="ew")
 
-        # Oyunu Kapat / İptal Et Butonu
         self.btn_kapat = tk.Button(
             self.frame_ayarlar,
             text="❌ Oyunu Kapat",
@@ -198,8 +206,13 @@ class MatematikOyunu:
         )
         self.lbl_animasyon.pack(expand=True)
 
+        self.lbl_geri_bildirim = tk.Label(
+            self.frame_ekran, text="", font=("Arial", 11, "bold")
+        )
+        self.lbl_geri_bildirim.pack(pady=5)
+
         frame_cevap = tk.Frame(self.frame_ekran)
-        frame_cevap.pack(pady=20)
+        frame_cevap.pack(pady=10)
 
         tk.Label(frame_cevap, text="Cevap: ", font=("Arial", 12)).pack(side="left")
         self.entry_cevap = tk.Entry(
@@ -247,6 +260,179 @@ class MatematikOyunu:
         self.txt_carpim.pack(side="left", fill="both", expand=True)
 
         self.tam_carpim_tablosu_olustur()
+
+    def setup_tab_hesap(self):
+        lbl_baslik = tk.Label(
+            self.tab_hesap,
+            text="Pratik Hesap Makinesi",
+            font=("Arial", 12, "bold"),
+        )
+        lbl_baslik.pack(pady=10)
+
+        self.calc_display_var = tk.StringVar(value="0")
+
+        display_frame = tk.Frame(self.tab_hesap, bd=2, relief="groove")
+        display_frame.pack(fill="x", padx=40, pady=10)
+
+        calc_entry = tk.Entry(
+            display_frame,
+            textvariable=self.calc_display_var,
+            font=("Arial", 22, "bold"),
+            justify="right",
+            bd=5,
+            relief="flat",
+        )
+        calc_entry.pack(fill="x", padx=10, pady=10)
+        calc_entry.bind("<Return>", lambda e: self.calc_hesapla())
+        calc_entry.bind("<Key>", self.calc_on_key)
+
+        btn_frame = tk.Frame(self.tab_hesap)
+        btn_frame.pack(fill="both", expand=True, padx=40, pady=10)
+
+        buttons = [
+            ("C", 0, 0, 1), ("←", 0, 1, 1), ("/", 0, 2, 1), ("*", 0, 3, 1),
+            ("7", 1, 0, 1), ("8", 1, 1, 1), ("9", 1, 2, 1), ("-", 1, 3, 1),
+            ("4", 2, 0, 1), ("5", 2, 1, 1), ("6", 2, 2, 1), ("+", 2, 3, 1),
+            ("1", 3, 0, 1), ("2", 3, 1, 1), ("3", 3, 2, 1), ("^", 3, 3, 1),
+            ("0", 4, 0, 1), (".", 4, 1, 1), ("=", 4, 2, 2)
+        ]
+
+        for item in buttons:
+            text = item[0]
+            r = item[1]
+            c = item[2]
+            cs = item[3]
+
+            if text == "=":
+                btn = tk.Button(
+                    btn_frame,
+                    text=text,
+                    font=("Arial", 14, "bold"),
+                    bg="#22c55e",
+                    fg="white",
+                    command=self.calc_hesapla,
+                )
+                btn.grid(row=r, column=c, columnspan=cs, sticky="nsew", padx=3, pady=3)
+            elif text == "C":
+                btn = tk.Button(
+                    btn_frame,
+                    text=text,
+                    font=("Arial", 14, "bold"),
+                    bg="#ef4444",
+                    fg="white",
+                    command=self.calc_temizle,
+                )
+                btn.grid(row=r, column=c, columnspan=cs, sticky="nsew", padx=3, pady=3)
+            elif text == "←":
+                btn = tk.Button(
+                    btn_frame,
+                    text=text,
+                    font=("Arial", 14, "bold"),
+                    command=self.calc_sil,
+                )
+                btn.grid(row=r, column=c, columnspan=cs, sticky="nsew", padx=3, pady=3)
+            else:
+                btn = tk.Button(
+                    btn_frame,
+                    text=text,
+                    font=("Arial", 14, "bold"),
+                    command=lambda t=text: self.calc_ekle(t),
+                )
+                btn.grid(row=r, column=c, columnspan=cs, sticky="nsew", padx=3, pady=3)
+
+        for i in range(5):
+            btn_frame.rowconfigure(i, weight=1)
+        for j in range(4):
+            btn_frame.columnconfigure(j, weight=1)
+
+    def setup_tab_gecmis(self):
+        lbl_baslik = tk.Label(
+            self.tab_gecmis,
+            text="Son Oynanan Turun Soru, Cevap ve Süre Geçmişi",
+            font=("Arial", 12, "bold"),
+        )
+        lbl_baslik.pack(pady=10)
+
+        frame_tree = tk.Frame(self.tab_gecmis)
+        frame_tree.pack(fill="both", expand=True, padx=20, pady=10)
+
+        columns = ("soru", "verilen", "dogru", "sure", "durum")
+        self.tree_gecmis = ttk.Treeview(
+            frame_tree, columns=columns, show="headings", height=15
+        )
+
+        self.tree_gecmis.heading("soru", text="Soru / İşlem")
+        self.tree_gecmis.heading("verilen", text="Verdiğiniz Cevap")
+        self.tree_gecmis.heading("dogru", text="Doğru Cevap")
+        self.tree_gecmis.heading("sure", text="Harcanan Süre")
+        self.tree_gecmis.heading("durum", text="Durum")
+
+        self.tree_gecmis.column("soru", width=260, anchor="w")
+        self.tree_gecmis.column("verilen", width=120, anchor="center")
+        self.tree_gecmis.column("dogru", width=120, anchor="center")
+        self.tree_gecmis.column("sure", width=120, anchor="center")
+        self.tree_gecmis.column("durum", width=100, anchor="center")
+
+        scrollbar = ttk.Scrollbar(
+            frame_tree, orient="vertical", command=self.tree_gecmis.yview
+        )
+        self.tree_gecmis.configure(yscrollcommand=scrollbar.set)
+
+        scrollbar.pack(side="right", fill="y")
+        self.tree_gecmis.pack(side="left", fill="both", expand=True)
+
+    def gecmis_guncelle(self):
+        for item in self.tree_gecmis.get_children():
+            self.tree_gecmis.delete(item)
+
+        for kayit in self.oyun_gecmisi:
+            self.tree_gecmis.insert(
+                "",
+                "end",
+                values=(
+                    kayit["soru"],
+                    kayit["verilen"],
+                    kayit["dogru"],
+                    kayit["sure"],
+                    kayit["durum"],
+                ),
+            )
+
+    def calc_on_key(self, event):
+        if self.calc_display_var.get() == "Hata":
+            if event.keysym not in ("Return", "BackSpace", "Tab", "Shift_L", "Shift_R", "Control_L", "Control_R"):
+                self.calc_display_var.set("")
+
+    def calc_ekle(self, char):
+        current = self.calc_display_var.get()
+        if current == "0" or current == "Hata":
+            self.calc_display_var.set(char)
+        else:
+            self.calc_display_var.set(current + char)
+
+    def calc_temizle(self):
+        self.calc_display_var.set("0")
+
+    def calc_sil(self):
+        current = self.calc_display_var.get()
+        if len(current) > 1 and current != "Hata":
+            self.calc_display_var.set(current[:-1])
+        else:
+            self.calc_display_var.set("0")
+
+    def calc_hesapla(self):
+        try:
+            expression = (
+                self.calc_display_var.get()
+                .replace("x", "*")
+                .replace("^", "**")
+            )
+            result = eval(expression)
+            if isinstance(result, float) and result.is_integer():
+                result = int(result)
+            self.calc_display_var.set(str(result))
+        except Exception:
+            self.calc_display_var.set("Hata")
 
     def tam_carpim_tablosu_olustur(self):
         self.txt_carpim.delete("1.0", tk.END)
@@ -322,21 +508,30 @@ class MatematikOyunu:
         except ValueError:
             return
 
+        if self.timer_job:
+            self.root.after_cancel(self.timer_job)
+            self.timer_job = None
+
         self.animasyonlari_temizle()
         self.kalan_hak = int(self.spin_hak.get())
         self.kalan_sure = int(self.spin_sure.get())
         self.puan = 0
+        self.oyun_gecmisi = []
+        self.gecmis_guncelle()
 
         self.btn_baslat.config(state="disabled")
         self.btn_kapat.config(state="normal")
-        self.lbl_bilgi.config(text="Oyun Başladı! Dikkatlice izle...")
+        self.lbl_bilgi.config(text="Oyun Başladı!")
+        self.lbl_geri_bildirim.config(text="Dikkatlice izle...", fg="black")
+        self.update_status()
 
-        self.sureyi_baslat()
-        self.yeni_soru_hazirla()
+        jid_ilk = self.root.after(300, self.yeni_soru_hazirla)
+        self.animasyon_jobs.append(jid_ilk)
 
     def oyun_kapat_manuel(self):
         if self.timer_job:
             self.root.after_cancel(self.timer_job)
+            self.timer_job = None
         self.animasyonlari_temizle()
 
         self.cevap_verilebilir = False
@@ -347,7 +542,8 @@ class MatematikOyunu:
 
         self.lbl_animasyon.config(text="?", fg="#888888")
         self.lbl_status.config(text="Hak: - | Süre: - | Puan: 0")
-        self.lbl_bilgi.config(text="Oyun kapatıldı.", fg="red")
+        self.lbl_bilgi.config(text="Oyun kapatıldı.")
+        self.lbl_geri_bildirim.config(text="Oyun sonlandırıldı.", fg="red")
 
     def sureyi_baslat(self):
         if self.timer_job:
@@ -359,7 +555,7 @@ class MatematikOyunu:
                 self.update_status()
                 self.timer_job = self.root.after(1000, guncelle)
             else:
-                self.oyun_bitti("Süre Doldu!")
+                self.oyun_bitti("⏰ Süre Doldu!")
 
         self.timer_job = self.root.after(1000, guncelle)
 
@@ -369,8 +565,12 @@ class MatematikOyunu:
         )
 
     def yeni_soru_hazirla(self):
+        if self.timer_job:
+            self.root.after_cancel(self.timer_job)
+            self.timer_job = None
+
         if self.kalan_hak <= 0:
-            self.oyun_bitti("Hakkınız Bitti!")
+            self.oyun_bitti("❌ Hakkınız Bitti!")
             return
 
         self.animasyonlari_temizle()
@@ -392,58 +592,65 @@ class MatematikOyunu:
         max_val = int(self.spin_aralik.get())
         basamak_sayisi = int(self.spin_basamak.get())
 
-        self.soru_parcalari = []
-        ilk_sayi = random.randint(min_val, max_val)
-        self.soru_parcalari.append(str(ilk_sayi))
+        while True:
+            self.soru_parcalari = []
+            ilk_sayi = random.randint(min_val, max_val)
+            self.soru_parcalari.append(str(ilk_sayi))
 
-        hesaplama_str = str(ilk_sayi)
+            hesaplama_str = str(ilk_sayi)
 
-        for _ in range(basamak_sayisi - 1):
-            op = random.choice(ops)
+            for _ in range(basamak_sayisi - 1):
+                op = random.choice(ops)
 
-            if op == "/":
-                anlik_deger = int(eval(hesaplama_str))
-                bolenler = [
-                    i for i in range(1, max(2, abs(anlik_deger) + 1)) if anlik_deger % i == 0
-                ]
-                if not bolenler:
-                    bolenler = [1]
-                sayi = random.choice(bolenler)
-                if random.choice([True, False]) and sayi != 0:
-                    sayi = -sayi
+                if op == "/":
+                    anlik_deger = int(eval(hesaplama_str))
+                    bolenler = [
+                        i for i in range(1, max(2, abs(anlik_deger) + 1)) if anlik_deger % i == 0
+                    ]
+                    if not bolenler:
+                        bolenler = [1]
+                    sayi = random.choice(bolenler)
+                    if random.choice([True, False]) and sayi != 0:
+                        sayi = -sayi
 
-                hesaplama_str += f" // {sayi}"
-                gorsel_op = "/"
+                    hesaplama_str += f" // {sayi}"
+                    gorsel_op = "/"
 
-            elif op == "^":
-                sayi = random.randint(1, 3)
-                hesaplama_str += f" ** {sayi}"
-                gorsel_op = "^"
+                elif op == "^":
+                    sayi = random.randint(1, 3)
+                    hesaplama_str += f" ** {sayi}"
+                    gorsel_op = "^"
 
-            elif op == "x":
-                sayi = random.randint(min(1, min_val), max(5, max_val // 2))
-                if sayi == 0:
-                    sayi = 1
-                hesaplama_str += f" * {sayi}"
-                gorsel_op = "x"
+                elif op == "x":
+                    sayi = random.randint(min(1, min_val), max(5, max_val // 2))
+                    if sayi == 0:
+                        sayi = 1
+                    hesaplama_str += f" * {sayi}"
+                    gorsel_op = "x"
 
-            elif op == "+":
-                sayi = random.randint(min_val, max_val)
-                hesaplama_str += f" + {sayi}"
-                gorsel_op = "+"
+                elif op == "+":
+                    sayi = random.randint(min_val, max_val)
+                    hesaplama_str += f" + {sayi}"
+                    gorsel_op = "+"
 
-            else:
-                sayi = random.randint(min_val, max_val)
-                hesaplama_str += f" - {sayi}"
-                gorsel_op = "-"
+                else:
+                    sayi = random.randint(min_val, max_val)
+                    hesaplama_str += f" - {sayi}"
+                    gorsel_op = "-"
 
-            self.soru_parcalari.append(gorsel_op)
-            self.soru_parcalari.append(str(sayi))
+                self.soru_parcalari.append(gorsel_op)
+                self.soru_parcalari.append(str(sayi))
 
-        try:
-            self.dogru_cevap = int(eval(hesaplama_str))
-        except Exception:
-            self.dogru_cevap = ilk_sayi
+            try:
+                self.dogru_cevap = int(eval(hesaplama_str))
+                if -9999 <= self.dogru_cevap <= 9999:
+                    self.guncel_islem_str = hesaplama_str
+                    break
+            except Exception:
+                self.dogru_cevap = ilk_sayi
+                if -9999 <= self.dogru_cevap <= 9999:
+                    self.guncel_islem_str = str(ilk_sayi)
+                    break
 
         self.entry_cevap.config(state="disabled")
         self.btn_gonder.config(state="disabled")
@@ -479,15 +686,24 @@ class MatematikOyunu:
             self.entry_cevap.delete(0, tk.END)
             self.entry_cevap.focus()
             self.cevap_verilebilir = True
-            self.lbl_bilgi.config(text="Cevabını gir ve gönder!", fg="black")
+            self.soru_baslangic_zamani = time.time()
+            self.lbl_geri_bildirim.config(text="Cevabını gir ve gönder!", fg="black")
+            self.sureyi_baslat()
 
     def cevap_kontrol(self):
         if not self.cevap_verilebilir:
             return
 
+        harcanan_sure = round(time.time() - self.soru_baslangic_zamani, 1)
+
+        if self.timer_job:
+            self.root.after_cancel(self.timer_job)
+            self.timer_job = None
+
         try:
             tahmin = int(self.entry_cevap.get().strip())
         except ValueError:
+            self.sureyi_baslat()
             return
 
         self.cevap_verilebilir = False
@@ -497,26 +713,45 @@ class MatematikOyunu:
         if tahmin == self.dogru_cevap:
             kazanilacak_puan = self.zorluk_puan_hesapla()
             self.puan += kazanilacak_puan
-            self.lbl_bilgi.config(
-                text=f"Doğru! (+{kazanilacak_puan} Puan)", fg="green"
+            self.lbl_geri_bildirim.config(
+                text=f"✔ Doğru! (+{kazanilacak_puan} Puan)", fg="green"
             )
+            durum_str = "✔ Doğru"
         else:
             self.kalan_hak -= 1
-            self.lbl_bilgi.config(
-                text=f"Yanlış! Doğru cevap: {self.dogru_cevap}", fg="red"
+            self.lbl_geri_bildirim.config(
+                text=f"❌ HATA! Doğru Cevap: {self.dogru_cevap}", fg="red"
             )
+            durum_str = "❌ Yanlış"
+
+        islem_str = (
+            self.guncel_islem_str.replace(" // ", " / ")
+            .replace(" ** ", " ^ ")
+            .replace(" * ", " x ")
+        )
+        self.oyun_gecmisi.append(
+            {
+                "soru": islem_str,
+                "verilen": tahmin,
+                "dogru": self.dogru_cevap,
+                "sure": f"{harcanan_sure} saniye",
+                "durum": durum_str,
+            }
+        )
+        self.gecmis_guncelle()
 
         self.update_status()
 
         if self.kalan_hak > 0:
-            jid = self.root.after(1200, self.yeni_soru_hazirla)
+            jid = self.root.after(1500, self.yeni_soru_hazirla)
             self.animasyon_jobs.append(jid)
         else:
-            self.oyun_bitti("Hakkınız Bitti!")
+            self.oyun_bitti("❌ Hakkınız Bitti!")
 
     def oyun_bitti(self, mesaj):
         if self.timer_job:
             self.root.after_cancel(self.timer_job)
+            self.timer_job = None
         self.animasyonlari_temizle()
 
         self.cevap_verilebilir = False
@@ -537,7 +772,7 @@ class MatematikOyunu:
             f"{mesaj}\nToplam Puanınız: {self.puan}{rek_mesaj}",
         )
         self.lbl_animasyon.config(text="?", fg="#888888")
-        self.lbl_bilgi.config(text="Oyun Bitti. Yeniden başlayabilirsiniz.")
+        self.lbl_geri_bildirim.config(text="Oyun Bitti. Yeniden başlayabilirsin.", fg="black")
 
     def toggle_theme(self):
         self.is_dark_mode = not self.is_dark_mode
@@ -551,6 +786,8 @@ class MatematikOyunu:
         self.top_frame.config(bg=theme["bg"])
         self.tab_oyun.config(bg=theme["bg"])
         self.tab_carpim.config(bg=theme["bg"])
+        self.tab_hesap.config(bg=theme["bg"])
+        self.tab_gecmis.config(bg=theme["bg"])
         self.frame_ekran.config(bg=theme["card_bg"])
         self.lbl_status.config(bg=theme["card_bg"], fg=theme["fg"])
 
