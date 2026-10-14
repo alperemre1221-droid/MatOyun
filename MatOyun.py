@@ -164,12 +164,24 @@ class MatematikOyunu:
             bg="#22c55e",
             fg="white",
         )
-        self.btn_baslat.grid(row=7, column=0, columnspan=2, pady=15, sticky="ew")
+        self.btn_baslat.grid(row=7, column=0, columnspan=2, pady=10, sticky="ew")
+
+        # Oyunu Kapat / İptal Et Butonu
+        self.btn_kapat = tk.Button(
+            self.frame_ayarlar,
+            text="❌ Oyunu Kapat",
+            command=self.oyun_kapat_manuel,
+            font=("Arial", 10, "bold"),
+            bg="#ef4444",
+            fg="white",
+            state="disabled",
+        )
+        self.btn_kapat.grid(row=8, column=0, columnspan=2, pady=5, sticky="ew")
 
         self.lbl_bilgi = tk.Label(
             self.frame_ayarlar, text="Hazırsan Başlat'a bas!", font=("Arial", 9)
         )
-        self.lbl_bilgi.grid(row=8, column=0, columnspan=2)
+        self.lbl_bilgi.grid(row=9, column=0, columnspan=2, pady=5)
 
         self.frame_ekran = tk.Frame(self.tab_oyun, bd=2, relief="groove")
         self.frame_ekran.pack(side="right", fill="both", expand=True, padx=10, pady=10)
@@ -316,10 +328,26 @@ class MatematikOyunu:
         self.puan = 0
 
         self.btn_baslat.config(state="disabled")
+        self.btn_kapat.config(state="normal")
         self.lbl_bilgi.config(text="Oyun Başladı! Dikkatlice izle...")
 
         self.sureyi_baslat()
         self.yeni_soru_hazirla()
+
+    def oyun_kapat_manuel(self):
+        if self.timer_job:
+            self.root.after_cancel(self.timer_job)
+        self.animasyonlari_temizle()
+
+        self.cevap_verilebilir = False
+        self.entry_cevap.config(state="disabled")
+        self.btn_gonder.config(state="disabled")
+        self.btn_baslat.config(state="normal")
+        self.btn_kapat.config(state="disabled")
+
+        self.lbl_animasyon.config(text="?", fg="#888888")
+        self.lbl_status.config(text="Hak: - | Süre: - | Puan: 0")
+        self.lbl_bilgi.config(text="Oyun kapatıldı.", fg="red")
 
     def sureyi_baslat(self):
         if self.timer_job:
@@ -495,6 +523,7 @@ class MatematikOyunu:
         self.entry_cevap.config(state="disabled")
         self.btn_gonder.config(state="disabled")
         self.btn_baslat.config(state="normal")
+        self.btn_kapat.config(state="disabled")
 
         if self.puan > self.rekor_puan:
             self.rekor_puan = self.puan
